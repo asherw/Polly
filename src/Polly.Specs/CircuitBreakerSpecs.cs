@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using FluentAssertions;
 using Polly.CircuitBreaker;
 using Polly.Specs.Helpers;
@@ -264,6 +265,75 @@ namespace Polly.Specs
 
             policy.Invoking(x => x.RaiseException<DivideByZeroException>())
                   .ShouldThrow<BrokenCircuitException>();
+        }
+
+        [Fact]
+        public void Should_throw_when_oncircuitbreak_action_is_null()
+        {
+            Action<Exception> nullOnCircuitBroken = null;
+
+            Action policy = () => Policy
+                                      .Handle<DivideByZeroException>()
+                                      .CircuitBreaker(1, TimeSpan.MaxValue, nullOnCircuitBroken);
+
+            policy.ShouldThrow<ArgumentNullException>().And
+                  .ParamName.Should().Be("onCircuitBroken");
+        }
+
+        [Fact]
+        public void Should_call_oncircuitbroken_upon_circuit_breaking_with_exception()
+        {
+            const string expectedException = "Exception";
+            Exception thrownException = null;
+
+            var policy = Policy
+                            .Handle<DivideByZeroException>()
+                            .CircuitBreaker(1, TimeSpan.FromMinutes(1), exception => thrownException = exception);
+
+            policy.Invoking(x => x.RaiseException<DivideByZeroException>(1, (e, i) => e.HelpLink = "Exception"))
+                  .ShouldThrow<DivideByZeroException>();
+
+            thrownException.HelpLink.Should().Be(expectedException);
+        }
+
+        [Fact]
+        public void Should_not_call_oncircuitbroken_before_circuit_is_broken()
+        {
+            Exception thrownException = null;
+
+            var policy = Policy
+                            .Handle<DivideByZeroException>()
+                            .CircuitBreaker(2, TimeSpan.FromMinutes(1), exception => thrownException = exception);
+
+            // Only invoking exception once, though 2 exceptions are required to break circuit.
+            policy.Invoking(x => x.RaiseException<DivideByZeroException>())
+                  .ShouldThrow<DivideByZeroException>();
+
+            thrownException.Should().BeNull();
+        }
+
+        [Fact]
+        public void Should_not_call_oncircuitbroken_after_circuit_is_broken()
+        {
+            int exceptionCounts = 0;
+            
+            var policy = Policy
+                            .Handle<DivideByZeroException>()
+                            .CircuitBreaker(2, TimeSpan.FromMinutes(1), exception => exceptionCounts++ );
+
+            // First call will throw exception, but onCircuitBroken will not be called.
+            policy.Invoking(x => x.RaiseException<DivideByZeroException>())
+                  .ShouldThrow<DivideByZeroException>();
+
+            // Second call should break exception, calling onCircuitBroken.
+            policy.Invoking(x => x.RaiseException<DivideByZeroException>())
+                  .ShouldThrow<DivideByZeroException>();
+
+            // Third call should throw BrokenCiruit exception, but do not expect onCircuitBroken to be called again.
+            policy.Invoking(x => x.RaiseException<DivideByZeroException>())
+                  .ShouldThrow<BrokenCircuitException>();
+
+            exceptionCounts.Should().Be(1);
         }
 
         public void Dispose()
