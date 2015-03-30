@@ -3,20 +3,20 @@ using Polly.Utilities;
 
 namespace Polly.CircuitBreaker
 {
-    internal class ServiceLevelCircuitBreakerState : ICircuitBreakerState
+    internal class SuccessRatioCircuitBreakerState : ICircuitBreakerState
     {
         private readonly TimeSpan _durationOfBreak;
-        private readonly double _serviceLevelPercent;
+        private readonly double _minSuccessRatio;
         private int _successCount;
         private int _failCount;
         private DateTime _blockedTill;
         private Exception _lastException;
         private readonly object _lock = new object();
 
-        public ServiceLevelCircuitBreakerState(double serviceLevelPercent, TimeSpan durationOfBreak)
+        public SuccessRatioCircuitBreakerState(double minSuccessRatio, TimeSpan durationOfBreak)
         {
             _durationOfBreak = durationOfBreak;
-            _serviceLevelPercent = serviceLevelPercent;
+            _minSuccessRatio = minSuccessRatio;
             Initialize();
         }
 
@@ -58,8 +58,8 @@ namespace Polly.CircuitBreaker
                 _lastException = ex;
                 _failCount += 1;
 
-                var currentServiceLevel = ((double)_successCount / (_successCount + _failCount)) * 100;
-                if (currentServiceLevel < _serviceLevelPercent)
+                var currentSuccessRatio = ((double)_successCount / (_successCount + _failCount)) * 100;
+                if (currentSuccessRatio < _minSuccessRatio)
                 {
                     BreakTheCircuit();
                 }
@@ -68,16 +68,15 @@ namespace Polly.CircuitBreaker
 
         private void BreakTheCircuit()
         {
-            var willDurationTakeUsPastDateTimeMaxValue = _durationOfBreak > DateTime.MaxValue - SystemClock.UtcNow();
+            var currentUtc = SystemClock.UtcNow();
+
+            var willDurationTakeUsPastDateTimeMaxValue = _durationOfBreak > DateTime.MaxValue - currentUtc;
             _blockedTill = willDurationTakeUsPastDateTimeMaxValue ?
                                DateTime.MaxValue :
-                               SystemClock.UtcNow() + _durationOfBreak;
+                               currentUtc + _durationOfBreak;
 
-            using (TimedLock.Lock(_lock))
-            {
-                _successCount = 0;
-                _failCount = 0;
-            }
+            _successCount = 0;
+            _failCount = 0;
         }
 
         private void Initialize()
