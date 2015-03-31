@@ -16,13 +16,13 @@ namespace Polly.CircuitBreaker
         private Exception _lastException;
         private readonly object _lock = new object();
 
-        const int HalfLife = 30;
-        private readonly double _decayFactor = Math.Log(0.5) / (TimeSpan.TicksPerSecond * HalfLife);
+        private readonly double _decayFactor;
 
-        public SuccessRatioCircuitBreakerState(double minSuccessRatio, TimeSpan durationOfBreak)
+        public SuccessRatioCircuitBreakerState(double minSuccessRatio, TimeSpan durationOfBreak, TimeSpan halfLife)
         {
             _durationOfBreak = durationOfBreak;
             _minSuccessRatio = minSuccessRatio;
+            _decayFactor = Math.Log(0.5) / (TimeSpan.TicksPerSecond * halfLife.TotalSeconds);
             Initialize();
         }
 
@@ -52,8 +52,10 @@ namespace Polly.CircuitBreaker
         {
             using (TimedLock.Lock(_lock))
             {
+                _successCount = Decay(_successCount, _lastSuccessUpdate);
                 _successCount += 1;
                 _lastSuccessUpdate = DateTime.UtcNow;
+
                 Initialize();
             }
         }
@@ -62,14 +64,15 @@ namespace Polly.CircuitBreaker
         {
             using (TimedLock.Lock(_lock))
             {
+
                 _lastException = ex;
+                _failCount = Decay(_failCount, _lastFailUpdate);
                 _failCount += 1;
                 _lastFailUpdate = DateTime.UtcNow;
 
                 var successDecay = Decay(_successCount, _lastSuccessUpdate);
-                var failDecay = Decay(_failCount, _lastFailUpdate);
 
-                var currentSuccessRatio = (successDecay / (successDecay + failDecay)) * 100;
+                var currentSuccessRatio = (successDecay / (successDecay + _failCount)) * 100;
                 if (currentSuccessRatio < _minSuccessRatio)
                 {
                     BreakTheCircuit();
