@@ -161,6 +161,28 @@ namespace Polly.Specs
                   .ShouldThrow<BrokenCircuitException>();
         }
 
+        [Fact]
+        public void VerifyDecayWorking()
+        {
+            var policy = Policy
+            .Handle<DivideByZeroException>()
+            .CircuitBreaker(99.0, TimeSpan.FromMinutes(1), TimeSpan.FromSeconds(30));
+
+            for (var i = 0; i < 1000; i++)
+            {
+                policy.Invoking(x => x.Execute(() => { })).ShouldNotThrow();  
+            }
+
+            SystemClock.UtcNow = () => DateTime.Now.AddHours(3);
+
+            policy.Invoking(x => x.RaiseException<DivideByZeroException>())
+                  .ShouldThrow<DivideByZeroException>();
+
+            policy.Invoking(x => x.RaiseException<DivideByZeroException>())
+              .ShouldThrow<BrokenCircuitException>();
+
+        }
+
         public void Dispose()
         {
             SystemClock.Reset();

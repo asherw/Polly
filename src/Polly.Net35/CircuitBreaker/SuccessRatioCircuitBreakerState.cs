@@ -54,7 +54,7 @@ namespace Polly.CircuitBreaker
             {
                 _successCount = Decay(_successCount, _lastSuccessUpdate);
                 _successCount += 1;
-                _lastSuccessUpdate = DateTime.UtcNow;
+                _lastSuccessUpdate = SystemClock.UtcNow();
 
                 Initialize();
             }
@@ -68,7 +68,7 @@ namespace Polly.CircuitBreaker
                 _lastException = ex;
                 _failCount = Decay(_failCount, _lastFailUpdate);
                 _failCount += 1;
-                _lastFailUpdate = DateTime.UtcNow;
+                _lastFailUpdate = SystemClock.UtcNow();
 
                 var successDecay = Decay(_successCount, _lastSuccessUpdate);
 
@@ -82,7 +82,7 @@ namespace Polly.CircuitBreaker
 
         private double Decay(double counter, DateTime lastUpdate)
         {
-            var now = DateTime.UtcNow;
+            var now = SystemClock.UtcNow();
 
             if (counter > 0.00001)
             {
