@@ -7,16 +7,22 @@ namespace Polly.CircuitBreaker
     {
         private readonly TimeSpan _durationOfBreak;
         private readonly double _minSuccessRatio;
-        private int _successCount;
-        private int _failCount;
+        private double _successCount;
+        private double _failCount;
+        private DateTime _lastSuccessUpdate;
+        private DateTime _lastFailUpdate;
+
         private DateTime _blockedTill;
         private Exception _lastException;
         private readonly object _lock = new object();
 
-        public SuccessRatioCircuitBreakerState(double minSuccessRatio, TimeSpan durationOfBreak)
+        private readonly double _decayFactor;
+
+        public SuccessRatioCircuitBreakerState(double minSuccessRatio, TimeSpan durationOfBreak, TimeSpan halfLife)
         {
             _durationOfBreak = durationOfBreak;
             _minSuccessRatio = minSuccessRatio;
+            _decayFactor = Math.Log(0.5) / (TimeSpan.TicksPerSecond * halfLife.TotalSeconds);
             Initialize();
         }
 
@@ -46,7 +52,10 @@ namespace Polly.CircuitBreaker
         {
             using (TimedLock.Lock(_lock))
             {
+                _successCount = Decay(_successCount, _lastSuccessUpdate);
                 _successCount += 1;
+                _lastSuccessUpdate = SystemClock.UtcNow();
+
                 Initialize();
             }
         }
@@ -55,15 +64,32 @@ namespace Polly.CircuitBreaker
         {
             using (TimedLock.Lock(_lock))
             {
-                _lastException = ex;
-                _failCount += 1;
 
-                var currentSuccessRatio = ((double)_successCount / (_successCount + _failCount)) * 100;
+                _lastException = ex;
+                _failCount = Decay(_failCount, _lastFailUpdate);
+                _failCount += 1;
+                _lastFailUpdate = SystemClock.UtcNow();
+
+                var successDecay = Decay(_successCount, _lastSuccessUpdate);
+
+                var currentSuccessRatio = (successDecay / (successDecay + _failCount)) * 100;
                 if (currentSuccessRatio < _minSuccessRatio)
                 {
                     BreakTheCircuit();
                 }
             }
+        }
+
+        private double Decay(double counter, DateTime lastUpdate)
+        {
+            var now = SystemClock.UtcNow();
+
+            if (counter > 0.00001)
+            {
+                counter *= Math.Exp((now - lastUpdate).Ticks * _decayFactor);
+            }
+
+            return counter;
         }
 
         private void BreakTheCircuit()
@@ -77,6 +103,8 @@ namespace Polly.CircuitBreaker
 
             _successCount = 0;
             _failCount = 0;
+            _lastSuccessUpdate = currentUtc;
+            _lastFailUpdate = currentUtc;
         }
 
         private void Initialize()

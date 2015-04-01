@@ -45,14 +45,15 @@ namespace Polly
         /// <param name="policyBuilder">The policy builder.</param>
         /// <param name="minSuccessRatio">The success rate required for the circuit to remain closed.</param>
         /// <param name="durationOfBreak">The duration the circuit will stay open before resetting.</param>
+        /// <param name="halfLife">The half life of counters</param>
         /// <returns>The policy instance.</returns>
         /// <remarks>(see "Release It!" by Michael T. Nygard fi)</remarks>
         /// <exception cref="System.ArgumentOutOfRangeException">serviceLevelPercent;Value cannot be less than zero.</exception>
-        public static Policy CircuitBreaker(this PolicyBuilder policyBuilder, double minSuccessRatio, TimeSpan durationOfBreak)
+        public static Policy CircuitBreaker(this PolicyBuilder policyBuilder, double minSuccessRatio, TimeSpan durationOfBreak, TimeSpan halfLife)
         {
             if (minSuccessRatio < 0) throw new ArgumentOutOfRangeException("minSuccessRatio", "Value cannot be less than zero.");
 
-            var policyState = new SuccessRatioCircuitBreakerState(minSuccessRatio, durationOfBreak);
+            var policyState = new SuccessRatioCircuitBreakerState(minSuccessRatio, durationOfBreak, halfLife);
             return new Policy(action => CircuitBreakerPolicy.Implementation(action, policyBuilder.ExceptionPredicates, policyState));
         }
     }

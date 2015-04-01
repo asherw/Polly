@@ -14,7 +14,7 @@ namespace Polly.Specs
         {
             var policy = Policy
                             .Handle<DivideByZeroException>()
-                            .CircuitBreaker(100.0, TimeSpan.MaxValue);
+                            .CircuitBreaker(100.0, TimeSpan.MaxValue, TimeSpan.FromSeconds(30));
 
             policy.Invoking(x => x.RaiseException<DivideByZeroException>())
                   .ShouldThrow<DivideByZeroException>();
@@ -25,7 +25,7 @@ namespace Polly.Specs
         {
            Action action = () => Policy
                                     .Handle<DivideByZeroException>()
-                                    .CircuitBreaker(-1.0, new TimeSpan());
+                                    .CircuitBreaker(-1.0, new TimeSpan(), TimeSpan.FromSeconds(30));
 
             action.ShouldThrow<ArgumentOutOfRangeException>()
                   .And.ParamName.Should()
@@ -37,7 +37,7 @@ namespace Polly.Specs
         {
             var policy = Policy
                             .Handle<DivideByZeroException>()
-                            .CircuitBreaker(45.0, TimeSpan.FromMinutes(1));
+                            .CircuitBreaker(45.0, TimeSpan.FromMinutes(1), TimeSpan.FromSeconds(30));
 
             policy.Invoking(x => x.Execute(() => { })).ShouldNotThrow();  
 
@@ -58,7 +58,7 @@ namespace Polly.Specs
         {
             var policy = Policy
                             .Handle<DivideByZeroException>()
-                            .CircuitBreaker(100.0, TimeSpan.FromMinutes(1));
+                            .CircuitBreaker(100.0, TimeSpan.FromMinutes(1), TimeSpan.FromSeconds(30));
 
             policy.Invoking(x => x.RaiseException<ArgumentNullException>())
                   .ShouldThrow<ArgumentNullException>();
@@ -80,7 +80,7 @@ namespace Polly.Specs
 
             var policy = Policy
                             .Handle<DivideByZeroException>()
-                            .CircuitBreaker(50.0, durationOfBreak);
+                            .CircuitBreaker(50.0, durationOfBreak, TimeSpan.FromSeconds(30));
 
             policy.Invoking(x => x.RaiseException<DivideByZeroException>())
                   .ShouldThrow<DivideByZeroException>();
@@ -106,7 +106,7 @@ namespace Polly.Specs
 
             var policy = Policy
                             .Handle<DivideByZeroException>()
-                            .CircuitBreaker(50.0, durationOfBreak);
+                            .CircuitBreaker(50.0, durationOfBreak, TimeSpan.FromSeconds(30));
 
             policy.Invoking(x => x.RaiseException<DivideByZeroException>())
                   .ShouldThrow<DivideByZeroException>();
@@ -136,7 +136,7 @@ namespace Polly.Specs
 
             var policy = Policy
                             .Handle<DivideByZeroException>()
-                            .CircuitBreaker(45.0, durationOfBreak);
+                            .CircuitBreaker(45.0, durationOfBreak, TimeSpan.FromSeconds(30));
 
             policy.Invoking(x => x.RaiseException<DivideByZeroException>())
                   .ShouldThrow<DivideByZeroException>();
@@ -159,6 +159,28 @@ namespace Polly.Specs
 
             policy.Invoking(x => x.RaiseException<DivideByZeroException>())
                   .ShouldThrow<BrokenCircuitException>();
+        }
+
+        [Fact]
+        public void VerifyDecayWorking()
+        {
+            var policy = Policy
+            .Handle<DivideByZeroException>()
+            .CircuitBreaker(99.0, TimeSpan.FromMinutes(1), TimeSpan.FromSeconds(30));
+
+            for (var i = 0; i < 1000; i++)
+            {
+                policy.Invoking(x => x.Execute(() => { })).ShouldNotThrow();  
+            }
+
+            SystemClock.UtcNow = () => DateTime.UtcNow.AddHours(3);
+
+            policy.Invoking(x => x.RaiseException<DivideByZeroException>())
+                  .ShouldThrow<DivideByZeroException>();
+
+            policy.Invoking(x => x.RaiseException<DivideByZeroException>())
+              .ShouldThrow<BrokenCircuitException>();
+
         }
 
         public void Dispose()
