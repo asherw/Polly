@@ -173,7 +173,7 @@ namespace Polly.Specs
                 policy.Invoking(x => x.Execute(() => { })).ShouldNotThrow();  
             }
 
-            SystemClock.UtcNow = () => DateTime.Now.AddHours(3);
+            SystemClock.UtcNow = () => DateTime.UtcNow.AddHours(3);
 
             policy.Invoking(x => x.RaiseException<DivideByZeroException>())
                   .ShouldThrow<DivideByZeroException>();
