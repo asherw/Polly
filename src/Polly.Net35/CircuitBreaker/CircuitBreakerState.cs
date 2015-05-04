@@ -7,15 +7,18 @@ namespace Polly.CircuitBreaker
     {
         private readonly TimeSpan _durationOfBreak;
         private readonly int _exceptionsAllowedBeforeBreaking;
+        private readonly Action<Exception> _onCircuitBroken;
+
         private int _count;
         private DateTime _blockedTill;
         private Exception _lastException;
         private readonly object _lock = new object();
 
-        public CircuitBreakerState(int exceptionsAllowedBeforeBreaking, TimeSpan durationOfBreak)
+        public CircuitBreakerState(int exceptionsAllowedBeforeBreaking, TimeSpan durationOfBreak, Action<Exception> onCircuitBroken)
         {
             _durationOfBreak = durationOfBreak;
             _exceptionsAllowedBeforeBreaking = exceptionsAllowedBeforeBreaking;
+            _onCircuitBroken = onCircuitBroken;
 
             Reset();
         }
@@ -63,6 +66,8 @@ namespace Polly.CircuitBreaker
                 if (_count >= _exceptionsAllowedBeforeBreaking)
                 {
                     BreakTheCircuit();
+
+                    _onCircuitBroken(ex);
                 }
             }
         }
