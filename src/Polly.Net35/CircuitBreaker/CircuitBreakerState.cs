@@ -3,7 +3,10 @@ using Polly.Utilities;
 
 namespace Polly.CircuitBreaker
 {
-    internal class CircuitBreakerState : ICircuitBreakerState
+    /// <summary>
+    /// Interface used to describe the needed functionality needed for the circuitbreaker pattern.
+    /// </summary>
+    public class CircuitBreakerState : ICircuitBreakerState
     {
         private readonly TimeSpan _durationOfBreak;
         private readonly int _exceptionsAllowedBeforeBreaking;
@@ -14,6 +17,12 @@ namespace Polly.CircuitBreaker
         private Exception _lastException;
         private readonly object _lock = new object();
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="exceptionsAllowedBeforeBreaking"></param>
+        /// <param name="durationOfBreak"></param>
+        /// <param name="onCircuitBroken"></param>
         public CircuitBreakerState(int exceptionsAllowedBeforeBreaking, TimeSpan durationOfBreak, Action<Exception> onCircuitBroken)
         {
             _durationOfBreak = durationOfBreak;
@@ -23,6 +32,9 @@ namespace Polly.CircuitBreaker
             Reset();
         }
 
+        /// <summary>
+        /// Last exception handled.
+        /// </summary>
         public Exception LastException
         {
             get
@@ -34,6 +46,10 @@ namespace Polly.CircuitBreaker
             }
         }
 
+        /// <summary>
+        /// Get current state of the circuit.
+        /// </summary>
+        /// <returns>bool that states wether the circuit is broken or not.</returns>
         public bool IsBroken
         {
             get
@@ -45,6 +61,9 @@ namespace Polly.CircuitBreaker
             }
         }
 
+        /// <summary>
+        /// Reset the state of the circuitbreaker.
+        /// </summary>
         public void Reset()
         {
             using (TimedLock.Lock(_lock))
@@ -56,6 +75,10 @@ namespace Polly.CircuitBreaker
             }
         }
 
+        /// <summary>
+        /// Used by Polly to try to break the circuit. If an exception is recieved that matches the policy, then Polly will call this method to try to break the state of the circuit.
+        /// </summary>
+        /// <param name="ex"></param>
         public void TryBreak(Exception ex)
         {
             using (TimedLock.Lock(_lock))
@@ -67,7 +90,8 @@ namespace Polly.CircuitBreaker
                 {
                     BreakTheCircuit();
 
-                    _onCircuitBroken(ex);
+                    if (_onCircuitBroken != null)
+                        _onCircuitBroken(ex);
                 }
             }
         }

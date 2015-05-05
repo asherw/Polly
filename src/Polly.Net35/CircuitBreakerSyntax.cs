@@ -56,10 +56,27 @@ namespace Polly
         public static Policy CircuitBreaker(this PolicyBuilder policyBuilder, int exceptionsAllowedBeforeBreaking, TimeSpan durationOfBreak, Action<Exception> onCircuitBroken)
         {
             if (exceptionsAllowedBeforeBreaking <= 0) throw new ArgumentOutOfRangeException("exceptionsAllowedBeforeBreaking", "Value must be greater than zero.");
-            if (onCircuitBroken == null) throw new ArgumentNullException("onCircuitBroken");
 
             var policyState = new CircuitBreakerState(exceptionsAllowedBeforeBreaking, durationOfBreak, onCircuitBroken);
-            return new Policy(action => CircuitBreakerPolicy.Implementation(action, policyBuilder.ExceptionPredicates, policyState));
+            return CircuitBreaker(policyBuilder, exceptionsAllowedBeforeBreaking, policyState);
+        }
+
+        /// <summary>
+        /// <para> Builds a <see cref="Policy"/> that will function like a Circuit Breaker.</para>
+        /// <para>The circuit will break after <paramref name="exceptionsAllowedBeforeBreaking"/>
+        /// exceptions that are handled by this policy are raised.</para>
+        /// </summary>
+        /// <param name="policyBuilder">The policy builder.</param>
+        /// <param name="exceptionsAllowedBeforeBreaking">The number of exceptions that are allowed before opening the circuit.</param>
+        /// <param name="circuitBreakerState">Use to provide own implementation of the circuitbreaker state.</param>
+        /// <returns>The policy instance.</returns>
+        /// <remarks>(see "Release It!" by Michael T. Nygard fi)</remarks>
+        /// <exception cref="System.ArgumentOutOfRangeException">exceptionsAllowedBeforeBreaking;Value must be greater than zero.</exception>
+        public static Policy CircuitBreaker(this PolicyBuilder policyBuilder, int exceptionsAllowedBeforeBreaking, ICircuitBreakerState circuitBreakerState)
+        {
+            if (exceptionsAllowedBeforeBreaking <= 0) throw new ArgumentOutOfRangeException("exceptionsAllowedBeforeBreaking", "Value must be greater than zero.");
+
+            return new Policy(action => CircuitBreakerPolicy.Implementation(action, policyBuilder.ExceptionPredicates, circuitBreakerState));
         }
 
         /// <summary>
